@@ -130,3 +130,4 @@ dmypy.json
 
 # Place data for non local DVC
 # /data 
+data/data_graduates_university_124_v20250709_csv/ 
