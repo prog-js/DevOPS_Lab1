@@ -29,10 +29,10 @@ class GraduateSpecialtyPreprocessor:
         self.label_encoders = {}
         self.scaler = StandardScaler()
         
-    def load_data(self, path='data/data_graduates_university_specialty_124_v20250709.csv'):
+    def load_data(self, path = os.path.join('data', 'data_graduates_university_124_v20250709_csv', 'data_graduates_university_specialty_124_v20250709.csv')):
         """Загрузка данных из CSV"""
         print(f"Загрузка данных из {path}...")
-        df = pd.read_csv(path, low_memory=False)
+        df = pd.read_csv(path, low_memory=False, sep=';')
         print(f"Загружено строк: {len(df)}")
         print(f"Колонок: {len(df.columns)}")
         return df
@@ -224,7 +224,7 @@ if __name__ == '__main__':
     processor = GraduateSpecialtyPreprocessor()
     
     # Загрузка данных (укажите корректный путь к вашему CSV)
-    df = processor.load_data('data/data_graduates_university_specialty_124_v20250709.csv')
+    df = processor.load_data(os.path.join('data', 'data_graduates_university_124_v20250709_csv', 'data_graduates_university_specialty_124_v20250709.csv'))
     
     # Предобработка
     df_processed = processor.preprocess(df, target_col='average_salary_fact_avg')
