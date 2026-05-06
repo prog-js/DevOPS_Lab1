@@ -147,24 +147,33 @@ class GraduateSpecialtyPreprocessor:
         
         return df
     
-    def split_and_save(self, df, target_col='average_salary_fact_avg'):
+    def split_and_save(self, df, target_col='average_salary_norm_med'):
         """
         Разделение данных на train/val/test и сохранение
         """
         print("\n--- Разделение данных ---")
         
+        # Колонки, которые исключаем из признаков
+        exclude_from_X = [
+            'average_salary_fact_avg',   # целевая
+            'average_salary_fact_med',   
+            'average_salary_norm_avg',   
+            'average_salary_norm_med'
+        ]
+        
         if target_col not in df.columns:
-            raise ValueError(f"Целевая колонка {target_col} не найдена в данных!")
+            raise ValueError(f"Целевая колонка {target_col} не найдена!")
         
-        X = df.drop(columns=[target_col])
+        # Формируем X и y
         y = df[target_col]
+        X = df.drop(columns=[target_col] + [c for c in exclude_from_X if c in df.columns])
         
-        print(f"Признаки X: {X.shape}")
-        print(f"Целевая y: {y.shape}")
+        print(f"Размерность X: {X.shape}")
+        print(f"Колонки X: {list(X.columns)[:10]}...")  # первые 10
         
         # Train/Val/Test: 70/15/15
         X_train, X_temp, y_train, y_temp = train_test_split(
-            X, y, test_size=0.3, random_state=42, stratify=None
+            X, y, test_size=0.3, random_state=42
         )
         X_val, X_test, y_val, y_test = train_test_split(
             X_temp, y_temp, test_size=0.5, random_state=42
@@ -176,14 +185,15 @@ class GraduateSpecialtyPreprocessor:
         
         # Масштабирование числовых признаков
         numeric_cols = X.select_dtypes(include=[np.number]).columns.tolist()
-        print(f"\nМасштабирование числовых признаков: {len(numeric_cols)} колонок")
+        print(f"\nМасштабирование {len(numeric_cols)} числовых признаков")
         
         X_train_scaled = self.scaler.fit_transform(X_train[numeric_cols])
         X_val_scaled = self.scaler.transform(X_val[numeric_cols])
         X_test_scaled = self.scaler.transform(X_test[numeric_cols])
         
-        # Сохранение данных в папку data/
+        # Сохранение
         os.makedirs('data', exist_ok=True)
+        os.makedirs('models', exist_ok=True)
         
         pd.DataFrame(X_train_scaled, columns=numeric_cols).to_csv('data/X_train.csv', index=False)
         pd.DataFrame(X_val_scaled, columns=numeric_cols).to_csv('data/X_val.csv', index=False)
@@ -193,43 +203,85 @@ class GraduateSpecialtyPreprocessor:
         y_val.to_csv('data/y_val.csv', index=False, header=[target_col])
         y_test.to_csv('data/y_test.csv', index=False, header=[target_col])
         
-        # Сохранение трансформеров
-        os.makedirs('models', exist_ok=True)
-        
         with open('models/scaler.pkl', 'wb') as f:
             pickle.dump(self.scaler, f)
         
-        with open('models/label_encoders.pkl', 'wb') as f:
-            pickle.dump(self.label_encoders, f)
-        
-        # Сохранить список числовых колонок (понадобится для API)
         with open('models/numeric_columns.pkl', 'wb') as f:
             pickle.dump(numeric_cols, f)
         
         print("\n--- Данные сохранены ---")
-        print(f"  X_train: data/X_train.csv")
-        print(f"  X_val: data/X_val.csv")
-        print(f"  X_test: data/X_test.csv")
-        print(f"  y_train: data/y_train.csv")
-        print(f"  y_val: data/y_val.csv")
-        print(f"  y_test: data/y_test.csv")
-        print(f"  scaler: models/scaler.pkl")
-        print(f"  label_encoders: models/label_encoders.pkl")
-        
-        return X_train_scaled, X_val_scaled, X_test_scaled, y_train, y_val, y_test
 
+
+    def check_missing_values(self, df, description="Данные"):
+        """
+        Подсчёт пропусков во всех колонках DataFrame
+        """
+        print(f"\n=== Анализ пропусков: {description} ===")
+        
+        # ЗАЩИТА: проверяем, что df - это DataFrame
+        if not hasattr(df, 'shape'):
+            print(f"❌ ОШИБКА: df не является DataFrame. Получен тип: {type(df)}")
+            print(f"Содержимое: {df}")
+            return None
+        
+        # Только теперь безопасно использовать .shape
+        total_cells = df.shape[0] * df.shape[1]
+        total_missing = df.isnull().sum().sum()
+        total_missing_percent = (total_missing / total_cells) * 100 if total_cells > 0 else 0
+        
+        print(f"Всего ячеек: {total_cells}")
+        print(f"Всего пропусков: {total_missing} ({total_missing_percent:.2f}%)")
+        
+        # Детальная информация по колонкам
+        missing_info = []
+        for col in df.columns:
+            missing_count = df[col].isnull().sum()
+            if missing_count > 0:
+                missing_percent = (missing_count / len(df)) * 100
+                missing_info.append({
+                    'Колонка': col,
+                    'Пропуски': missing_count,
+                    'Процент': f"{missing_percent:.2f}%",
+                    'Тип': df[col].dtype
+                })
+        
+        if missing_info:
+            import pandas as pd
+            missing_df = pd.DataFrame(missing_info)
+            missing_df = missing_df.sort_values('Пропуски', ascending=False)
+            print("\nДетали по колонкам с пропусками:")
+            print(missing_df.to_string(index=False))
+        else:
+            print("\n✅ Пропусков нет!")
+        
+        return missing_df if missing_info else pd.DataFrame()
 
 if __name__ == '__main__':
     # Инициализация и запуск
     processor = GraduateSpecialtyPreprocessor()
+
+    file_path = os.path.join('data', 'data_graduates_university_124_v20250709_csv', 
+                             'data_graduates_university_specialty_124_v20250709.csv')
+    
+    # ЗАГРУЗКА: получаем DataFrame
+    print("Загрузка данных...")
+    df = processor.load_data(file_path)
+    print(f"Получен тип: {type(df)}")
+    # ПРОВЕРКА: передаём DataFrame
+    print("\nПроверка пропусков в исходных данных:")
+    processor.check_missing_values(df)
     
     # Загрузка данных (укажите корректный путь к вашему CSV)
-    df = processor.load_data(os.path.join('data', 'data_graduates_university_124_v20250709_csv', 'data_graduates_university_specialty_124_v20250709.csv'))
+    #df = processor.load_data(os.path.join('data', 'data_graduates_university_124_v20250709_csv', 'data_graduates_university_specialty_124_v20250709.csv'))
     
     # Предобработка
-    df_processed = processor.preprocess(df, target_col='average_salary_fact_avg')
+    df_processed = processor.preprocess(df, target_col='average_salary_norm_med')
     
     # Разделение и сохранение
-    processor.split_and_save(df_processed, target_col='average_salary_fact_avg')
+    processor.split_and_save(df_processed, target_col='average_salary_norm_med')
     
     print("\n✅ Готово! Данные предобработаны и сохранены.")
+    # Путь к файлу
+    
+    
+    
