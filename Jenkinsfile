@@ -7,12 +7,6 @@ pipeline {
     }
     
     stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
-        
         stage('Build Docker Image') {
             steps {
                 script {
@@ -35,13 +29,11 @@ pipeline {
         
         stage('Test Container') {
             steps {
-                sh '''
-                    docker run -d --name test-${BUILD_NUMBER} -p 8888:8000 ${DOCKER_IMAGE}:${DOCKER_TAG}
-                    sleep 10
-                    curl -f http://localhost:8888/health || exit 1
-                    docker stop test-${BUILD_NUMBER}
-                    docker rm test-${BUILD_NUMBER}
-                '''
+                script {
+                    docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").inside("-p 8888:8000") {
+                        sh 'curl -f http://localhost:8888/health'
+                    }
+                }
             }
         }
     }
