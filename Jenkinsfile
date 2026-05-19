@@ -45,13 +45,4 @@ pipeline {
             }
         }
     }
-    
-    post {
-        success {
-            echo "✅ Образ ${DOCKER_IMAGE}:${DOCKER_TAG} успешно загружен!"
-        }
-        failure {
-            echo "❌ Сборка не удалась!"
-        }
-    }
 }
