@@ -2,10 +2,8 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_HUB_USER = '4ddocker'
-        DOCKER_HUB_PASS = credentials('docker')
-        IMAGE_NAME = "${DOCKER_HUB_USER}/lab1:${env.BUILD_NUMBER}"
-        IMAGE_LATEST = "${DOCKER_HUB_USER}/lab1:latest"
+        IMAGE_NAME = "4ddocker/lab1:${env.BUILD_NUMBER}"
+        IMAGE_LATEST = "4ddocker/lab1:latest"
     }
 
     stages {
@@ -33,26 +31,15 @@ pipeline {
             }
         }
 
-        stage('Push to Docker Hub') {
-            steps {
-                echo '📤 Публикация образа на Docker Hub...'
-                bat "echo ${DOCKER_HUB_PASS} | docker login -u ${DOCKER_HUB_USER} --password-stdin"
-                bat "docker push ${IMAGE_NAME}"
-                bat "docker push ${IMAGE_LATEST}"
-                bat "docker logout"
-                echo '✅ Образ опубликован'
-            }
-        }
-
         stage('Test Container') {
             steps {
                 echo '🧪 Запуск тестового контейнера...'
                 bat """
-                    docker run -d --name test-container -p 8888:8000 ${IMAGE_NAME}
+                    docker run -d --name test-container-${BUILD_NUMBER} -p 8888:8000 ${IMAGE_NAME}
                     timeout /t 10 /nobreak > nul
                     curl -f http://localhost:8888/health || exit 1
-                    docker stop test-container
-                    docker rm test-container
+                    docker stop test-container-${BUILD_NUMBER}
+                    docker rm test-container-${BUILD_NUMBER}
                 """
                 echo '✅ Контейнер успешно протестирован'
             }
@@ -62,11 +49,11 @@ pipeline {
     post {
         always {
             script {
-                bat 'docker logout || true'
+                bat 'docker rmi ${IMAGE_NAME} ${IMAGE_LATEST} || true'
             }
         }
         success {
-            echo '🎉 CI/CD Pipeline успешно выполнен!'
+            echo '🎉 Pipeline успешно выполнен!'
         }
         failure {
             echo '❌ Pipeline завершился с ошибкой. Проверьте логи выше.'
