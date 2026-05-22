@@ -17,7 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Копируем весь код проекта
 COPY src/ ./src/
-COPY models/ ./models/
+# COPY models/ ./models/
 COPY data/ ./data/
 COPY config.ini .
 
